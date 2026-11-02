@@ -93,15 +93,20 @@ jobs:
         id: execute
         continue-on-error: true
         run: |
+          mkdir -p "reports/${MOBILE_PLATFORM}"
           python -m pytest "tests/${MOBILE_PLATFORM}" -v --reruns 1 --reruns-delay 1 \
             --junitxml="reports/${MOBILE_PLATFORM}/junit.xml" \
             --html="reports/${MOBILE_PLATFORM}/report.html" --self-contained-html
-      - name: Publish automated TestRail results
-        if: inputs.publish_testrail && always() && steps.execute.outcome != 'skipped'
-        run: python -m mobileqa.integrations --platform "${MOBILE_PLATFORM}" --testrail
-      - name: Publish triaged Jira Bug candidates
-        if: inputs.publish_jira && always() && steps.execute.outcome != 'skipped'
-        run: python -m mobileqa.integrations --platform "${MOBILE_PLATFORM}" --jira
+      - name: Publish TestRail results and triaged Jira candidates
+        if: ${{ always() && steps.execute.outcome != 'skipped' && (inputs.publish_testrail || inputs.publish_jira) }}
+        env:
+          PUBLISH_TESTRAIL: ${{ inputs.publish_testrail }}
+          PUBLISH_JIRA: ${{ inputs.publish_jira }}
+        run: |
+          args=(--platform "${MOBILE_PLATFORM}")
+          if [ "$PUBLISH_TESTRAIL" = "true" ]; then args+=(--testrail); fi
+          if [ "$PUBLISH_JIRA" = "true" ]; then args+=(--jira); fi
+          python -m mobileqa.integrations "${args[@]}"
       - name: Upload evidence and execution results
         if: always()
         uses: actions/upload-artifact@v4
