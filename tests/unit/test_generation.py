@@ -1,7 +1,5 @@
 """Credential-free tests of generation and safety."""
 
-import json
-
 import pytest
 
 from mobileqa.generator import base_cases, generate, load_plan, save_plan, validate
