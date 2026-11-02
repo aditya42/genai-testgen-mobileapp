@@ -1,0 +1,27 @@
+name: Mobile Framework Quality
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Lint Python
+        run: ruff check mobileqa tests conftest.py
+      - name: Compile Python
+        run: python -m compileall -q mobileqa tests conftest.py
+      - name: Generate both platform plans
+        run: |
+          python -m mobileqa.generator --platform android --provider mock
+          python -m mobileqa.generator --platform ios --provider mock
+      - name: Run credential-free regression tests
+        run: python -m pytest tests/unit -q

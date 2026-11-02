@@ -1,0 +1,119 @@
+name: BrowserStack Android and iOS Appium
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platforms to execute
+        required: true
+        type: choice
+        default: both
+        options: [both, android, ios]
+      provider:
+        description: Test generation provider
+        required: true
+        type: choice
+        default: mock
+        options: [mock, openai]
+      publish_testrail:
+        description: Publish automated results into TestRail
+        required: true
+        type: boolean
+        default: false
+      publish_jira:
+        description: File repeatable assertion failures as Jira review candidates
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-regression-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cloud-mobile:
+    name: Appium ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.platform == 'both' && '["android","ios"]' || format('["{0}"]', inputs.platform)) }}
+    env:
+      MOBILE_PLATFORM: ${{ matrix.platform }}
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      BROWSERSTACK_ANDROID_APP_ID: ${{ secrets.BROWSERSTACK_ANDROID_APP_ID }}
+      BROWSERSTACK_IOS_APP_ID: ${{ secrets.BROWSERSTACK_IOS_APP_ID }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TESTRAIL_URL: ${{ vars.TESTRAIL_URL }}
+      TESTRAIL_PROJECT_ID: ${{ vars.TESTRAIL_PROJECT_ID }}
+      TESTRAIL_SECTION_ID: ${{ vars.TESTRAIL_SECTION_ID }}
+      TESTRAIL_SUITE_ID: ${{ vars.TESTRAIL_SUITE_ID }}
+      TESTRAIL_EMAIL: ${{ secrets.TESTRAIL_EMAIL }}
+      TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
+      JIRA_URL: ${{ vars.JIRA_URL }}
+      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      BROWSERSTACK_BUILD_NAME: Mobile Regression - ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Validate BrowserStack credentials and uploaded app ID
+        run: |
+          python - <<'PY'
+          import os
+          from mobileqa.config import Settings
+          Settings.from_env(os.environ["MOBILE_PLATFORM"])
+          print("BrowserStack app and credentials configured")
+          PY
+      - name: Validate TestRail publishing configuration
+        if: inputs.publish_testrail
+        run: |
+          for name in TESTRAIL_URL TESTRAIL_PROJECT_ID TESTRAIL_SECTION_ID TESTRAIL_EMAIL TESTRAIL_API_KEY; do
+            test -n "${!name}" || { echo "::error::Missing $name"; exit 1; }
+          done
+      - name: Validate Jira publishing configuration
+        if: inputs.publish_jira
+        run: |
+          for name in JIRA_URL JIRA_PROJECT_KEY JIRA_EMAIL JIRA_API_TOKEN; do
+            test -n "${!name}" || { echo "::error::Missing $name"; exit 1; }
+          done
+      - name: Generate bounded native cases with GenAI
+        run: python -m mobileqa.generator --platform "${MOBILE_PLATFORM}" --provider ${{ inputs.provider }}
+      - name: Execute native Appium tests on BrowserStack
+        id: execute
+        continue-on-error: true
+        run: |
+          python -m pytest "tests/${MOBILE_PLATFORM}" -v --reruns 1 --reruns-delay 1 \
+            --junitxml="reports/${MOBILE_PLATFORM}/junit.xml" \
+            --html="reports/${MOBILE_PLATFORM}/report.html" --self-contained-html
+      - name: Publish automated TestRail results
+        if: inputs.publish_testrail && always() && steps.execute.outcome != 'skipped'
+        run: python -m mobileqa.integrations --platform "${MOBILE_PLATFORM}" --testrail
+      - name: Publish triaged Jira Bug candidates
+        if: inputs.publish_jira && always() && steps.execute.outcome != 'skipped'
+        run: python -m mobileqa.integrations --platform "${MOBILE_PLATFORM}" --jira
+      - name: Upload evidence and execution results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-evidence-${{ matrix.platform }}-${{ github.run_id }}
+          path: |
+            plans/
+            reports/
+            screenshots/
+          if-no-files-found: ignore
+      - name: Fail workflow on failed native tests
+        if: always() && steps.execute.outcome == 'failure'
+        run: |
+          echo "::error::Native test run failed. See TestRail results and BrowserStack recordings."
+          exit 1
