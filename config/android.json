@@ -1,0 +1,9 @@
+{
+  "_note": "Provisional: confirm accessibility IDs using Appium Inspector and the exact uploaded APK.",
+  "catalog": {"by": "accessibility id", "value": "test-PRODUCTS"},
+  "first_product": {"by": "accessibility id", "value": "test-Item"},
+  "product_detail": {"by": "accessibility id", "value": "test-Description"},
+  "add_to_cart": {"by": "accessibility id", "value": "test-ADD TO CART"},
+  "cart_button": {"by": "accessibility id", "value": "test-Cart"},
+  "cart_item": {"by": "accessibility id", "value": "test-Cart Item"}
+}
