@@ -12,9 +12,6 @@ from appium import webdriver
 from mobileqa.config import HUB_URL, Settings
 
 ATTEMPTS = defaultdict(list)
-ERRORS = ("no such element", "timed out", "timeout", "connection", "appium",
-          "device offline", "session not created", "unknown server error")
-
 
 @pytest.fixture
 def driver(request):
@@ -57,14 +54,15 @@ def pytest_runtest_makereport(item, call):
     case_id = _case_id(item)
     if not case_id:
         return
-    message = str(report.longrepr)[:3500] if report.failed else ""
-    ATTTEMPT = {
-        "status": "failed" if report.failed else "passed",
+    failed = report.failed or report.outcome == "rerun"
+    message = str(report.longrepr)[:3500] if failed else ""
+    attempt = {
+        "status": "failed" if failed else "passed",
         "phase": report.when,
         "error": re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", message),
     }
-    ATTEMPTS[case_id].append(ATTTEMPT)
-    if report.failed:
+    ATTEMPTS[case_id].append(attempt)
+    if failed:
         item._appium_failed = True
         session = getattr(item, "_appium_driver", None)
         if session is not None:
@@ -73,7 +71,7 @@ def pytest_runtest_makereport(item, call):
                 folder.mkdir(parents=True, exist_ok=True)
                 filename = folder / f"{case_id}-{len(ATTEMPTS[case_id])}.png"
                 session.save_screenshot(str(filename))
-                ATTTEMPT["screenshot"] = str(filename)
+                attempt["screenshot"] = str(filename)
             except Exception:
                 pass
 
