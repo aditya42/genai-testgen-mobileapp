@@ -51,7 +51,10 @@ def test_cart_action_scrolls_once_when_initially_offscreen(platform, direction):
     }})
     button = Mock()
     with patch("mobileqa.pages.WebDriverWait") as waiter:
-        waiter.return_value.until.side_effect = [TimeoutException(), button]
+        waiter.return_value.until.side_effect = (
+            [TimeoutException(), button, Mock()] if platform == "iOS"
+            else [TimeoutException(), button]
+        )
         screen.add_to_cart()
     assert driver.execute_script.call_count == 1
     assert direction in driver.execute_script.call_args.args[0]
@@ -134,4 +137,6 @@ def test_ios_requires_remove_state_after_add_to_cart():
         screen.add_to_cart()
     button.click.assert_called_once()
     assert waiter.return_value.until.call_count == 2
-    assert "test-REMOVE" in str(waiter.return_value.until.call_args)
+    assert "Add to cart click did not produce REMOVE state" in (
+        waiter.return_value.until.call_args.args[1]
+    )
