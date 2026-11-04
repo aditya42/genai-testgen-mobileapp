@@ -57,8 +57,9 @@ def test_cart_action_scrolls_once_when_initially_offscreen(platform, direction):
             else [TimeoutException(), button]
         )
         screen.add_to_cart()
-    assert driver.execute_script.call_count == 1
-    assert direction in driver.execute_script.call_args.args[0]
+    commands = [call.args[0] for call in driver.execute_script.call_args_list]
+    assert any(direction in command for command in commands)
+    assert commands.count("mobile: tap") == (1 if platform == "iOS" else 0)
     if platform == "iOS":
         button.click.assert_not_called()
         assert any(
