@@ -79,3 +79,17 @@ def test_login_error_reads_only_supported_platform_attributes(platform, expected
         screen.assert_invalid_password()
     attributes_used = {call.args[0] for call in element.get_attribute.call_args_list}
     assert attributes_used == expected_attributes
+
+
+def test_cart_asserts_product_without_relying_on_screen_header():
+    from mobileqa.pages import CartScreen
+
+    driver = Mock()
+    screen = CartScreen(driver, {"cart_item": {
+        "by": "accessibility id", "value": "test-Item"
+    }})
+    item = Mock()
+    item.is_displayed.return_value = True
+    with patch.object(screen, "visible", return_value=item) as visible:
+        screen.assert_item()
+    visible.assert_called_once_with("cart_item")
