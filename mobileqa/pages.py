@@ -105,9 +105,20 @@ class ProductScreen(BaseScreen):
         platform = str(self.driver.capabilities.get("platformName", "")).lower()
         for attempt in range(3):
             try:
-                WebDriverWait(self.driver, 4).until(
+                button = WebDriverWait(self.driver, 4).until(
                     ec.element_to_be_clickable(self.locator("add_to_cart"))
-                ).click()
+                )
+                if platform == "ios":
+                    # WebElement.click() returned successfully but did not
+                    # activate ADD TO CART in BrowserStack run 41827351144.
+                    # Native coordinate tap targets the visible button itself.
+                    rect = button.rect
+                    self.driver.execute_script("mobile: tap", {
+                        "x": int(rect["x"] + rect["width"] / 2),
+                        "y": int(rect["y"] + rect["height"] / 2),
+                    })
+                else:
+                    button.click()
                 break
             except TimeoutException:
                 if attempt == 2:

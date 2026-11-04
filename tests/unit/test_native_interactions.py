@@ -58,7 +58,14 @@ def test_cart_action_scrolls_once_when_initially_offscreen(platform, direction):
         screen.add_to_cart()
     assert driver.execute_script.call_count == 1
     assert direction in driver.execute_script.call_args.args[0]
-    button.click.assert_called_once()
+    if platform == "iOS":
+        button.click.assert_not_called()
+        assert any(
+            call.args[0] == "mobile: tap"
+            for call in driver.execute_script.call_args_list
+        )
+    else:
+        button.click.assert_called_once()
 
 
 @pytest.mark.parametrize("platform,expected_attributes", [
@@ -125,6 +132,20 @@ def test_android_cart_keeps_element_click():
     driver.execute_script.assert_not_called()
 
 
+def test_android_add_to_cart_uses_element_click():
+    driver = Mock()
+    driver.capabilities = {"platformName": "Android"}
+    screen = ProductScreen(driver, {"add_to_cart": {
+        "by": "accessibility id", "value": "test-ADD TO CART"
+    }})
+    button = Mock()
+    with patch("mobileqa.pages.WebDriverWait") as waiter:
+        waiter.return_value.until.return_value = button
+        screen.add_to_cart()
+    button.click.assert_called_once()
+    driver.execute_script.assert_not_called()
+
+
 def test_ios_requires_remove_state_after_add_to_cart():
     driver = Mock()
     driver.capabilities = {"platformName": "iOS"}
@@ -132,10 +153,14 @@ def test_ios_requires_remove_state_after_add_to_cart():
         "by": "accessibility id", "value": "test-ADD TO CART"
     }})
     button = Mock()
+    button.rect = {"x": 25, "y": 267, "width": 340, "height": 41}
     with patch("mobileqa.pages.WebDriverWait") as waiter:
         waiter.return_value.until.side_effect = [button, Mock()]
         screen.add_to_cart()
-    button.click.assert_called_once()
+    button.click.assert_not_called()
+    driver.execute_script.assert_called_once_with(
+        "mobile: tap", {"x": 195, "y": 287}
+    )
     assert waiter.return_value.until.call_count == 2
     assert "Add to cart click did not produce REMOVE state" in (
         waiter.return_value.until.call_args.args[1]
