@@ -55,3 +55,27 @@ def test_cart_action_scrolls_once_when_initially_offscreen(platform, direction):
     assert driver.execute_script.call_count == 1
     assert direction in driver.execute_script.call_args.args[0]
     button.click.assert_called_once()
+
+
+@pytest.mark.parametrize("platform,expected_attributes", [
+    ("Android", {"content-desc", "text", "name"}),
+    ("iOS", {"label", "name", "value"}),
+])
+def test_login_error_reads_only_supported_platform_attributes(platform, expected_attributes):
+    element = Mock()
+    element.text = ""
+    message = "Username and password do not match any user in this service."
+    element.get_attribute.side_effect = lambda key: (
+        message if key == ("label" if platform == "iOS" else "content-desc")
+        else None
+    )
+    element.find_elements.return_value = []
+    driver = Mock()
+    driver.capabilities = {"platformName": platform}
+    screen = LoginScreen(driver, {"login_error": {
+        "by": "accessibility id", "value": "test-Error message"
+    }})
+    with patch.object(screen, "visible", return_value=element):
+        screen.assert_invalid_password()
+    attributes_used = {call.args[0] for call in element.get_attribute.call_args_list}
+    assert attributes_used == expected_attributes
