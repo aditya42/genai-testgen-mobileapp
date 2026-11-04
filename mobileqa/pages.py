@@ -60,16 +60,23 @@ class LoginScreen(BaseScreen):
         # meaningful message is exposed as a content description or child label.
         def error_message(_driver):
             element = self.visible("login_error")
-            candidates = [
-                element.text,
-                element.get_attribute("content-desc"),
-                element.get_attribute("contentDescription"),
-                element.get_attribute("label"),
-                element.get_attribute("name"),
-            ]
-            candidates.extend(child.text for child in element.find_elements(
-                AppiumBy.CLASS_NAME, "android.widget.TextView"
-            ))
+            platform = str(
+                self.driver.capabilities.get("platformName", "")
+            ).lower()
+            # Avoid requesting 'label' on UiAutomator2: Android rejects that
+            # iOS-only attribute with UnknownMethodException.
+            attributes = (
+                ("label", "name", "value") if platform == "ios"
+                else ("content-desc", "text", "name")
+            )
+            candidates = [element.text]
+            candidates.extend(element.get_attribute(key) for key in attributes)
+            if platform == "android":
+                candidates.extend(
+                    child.text for child in element.find_elements(
+                        AppiumBy.CLASS_NAME, "android.widget.TextView"
+                    )
+                )
             return next(
                 (value for value in candidates if value and
                  "Username and password do not match" in value), False
