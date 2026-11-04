@@ -101,14 +101,14 @@ class ProductScreen(BaseScreen):
         assert self.visible("product_detail").is_displayed(), "Product details not displayed"
 
     def add_to_cart(self):
-        # Product details place the purchase controls below the initial viewport
-        # on some Android devices; use a bounded native scroll before failing.
+        # The purchase control can initially be below the device viewport.
+        platform = str(self.driver.capabilities.get("platformName", "")).lower()
         for attempt in range(3):
             try:
                 WebDriverWait(self.driver, 4).until(
                     ec.element_to_be_clickable(self.locator("add_to_cart"))
                 ).click()
-                return
+                break
             except TimeoutException:
                 if attempt == 2:
                     raise TimeoutException(
@@ -116,7 +116,7 @@ class ProductScreen(BaseScreen):
                         f"{self.locator('add_to_cart')}"
                     ) from None
                 size = self.driver.get_window_size()
-                if str(self.driver.capabilities.get("platformName", "")).lower() == "ios":
+                if platform == "ios":
                     self.driver.execute_script("mobile: swipe", {"direction": "up"})
                 else:
                     self.driver.execute_script("mobile: scrollGesture", {
@@ -127,19 +127,24 @@ class ProductScreen(BaseScreen):
                         "direction": "down",
                         "percent": 0.75,
                     })
+        if platform == "ios":
+            # Swag Labs 2.7.1 renders REMOVE after an item is actually added.
+            # Check the state transition before attempting cart navigation.
+            WebDriverWait(self.driver, 8).until(
+                ec.presence_of_element_located(
+                    (AppiumBy.ACCESSIBILITY_ID, "test-REMOVE")
+                ),
+                "Add to cart click did not produce REMOVE state on iOS",
+            )
 
     def open_cart(self):
-        # On iOS 2.7.1, WebElement.click() on the cart accessibility
-        # container completed without navigation (BrowserStack screenshot,
-        # run 41824169357). Tap its on-screen center using XCUITest instead.
         platform = str(self.driver.capabilities.get("platformName", "")).lower()
         if platform == "ios":
-            element = self.visible("cart_button")
-            rect = element.rect
-            self.driver.execute_script("mobile: tap", {
-                "x": int(rect["x"] + rect["width"] / 2),
-                "y": int(rect["y"] + rect["height"] / 2),
-            })
+            # The IPA's JS bundle nests the onPress TouchableOpacity beneath
+            # the 'test-Cart' View. Click the actionable child, not its wrapper.
+            parent = self.visible("cart_button")
+            child = parent.find_element(AppiumBy.XPATH, "./*")
+            child.click()
         else:
             self.tap("cart_button")
 
