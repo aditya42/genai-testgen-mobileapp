@@ -24,5 +24,9 @@ def test_all_native_selector_names_present(platform):
     selectors = load_selectors(platform)
     assert REQUIRED.issubset(selectors)
     assert selectors["cart_item"]["value"] == "test-Item"
-    assert selectors["cart_screen"]["value"] == "test-Cart Content"
+    if platform == "ios":
+        assert selectors["cart_screen"]["by"] == "xpath"
+        assert "YOUR CART" in selectors["cart_screen"]["value"]
+    else:
+        assert selectors["cart_screen"]["value"] == "test-Cart Content"
     assert selectors["login_button"]["value"] == "test-LOGIN"
