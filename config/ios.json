@@ -1,5 +1,5 @@
 {
-  "_note": "Swag Labs Mobile Sample 2.7.1 IOS locator candidates. iOS JS bundle defines test- accessibility IDs/labels; inspect real-device UI hierarchy before treating these as validated.",
+  "_note": "Swag Labs Mobile Sample 2.7.1 iOS selectors. iOS cart header is 'YOUR CART' in the uploaded IPA's main.jsbundle; 'Cart Content' is a screen identifier and was not discoverable by XCUITest in run 41822022363. Confirm UI hierarchy after next run.",
   "username": {
     "by": "accessibility id",
     "value": "test-Username"
@@ -37,8 +37,8 @@
     "value": "test-Cart"
   },
   "cart_screen": {
-    "by": "accessibility id",
-    "value": "test-Cart Content"
+    "by": "xpath",
+    "value": "//*[@label='YOUR CART' or @name='YOUR CART']"
   },
   "cart_item": {
     "by": "accessibility id",
