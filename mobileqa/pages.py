@@ -129,7 +129,19 @@ class ProductScreen(BaseScreen):
                     })
 
     def open_cart(self):
-        self.tap("cart_button")
+        # On iOS 2.7.1, WebElement.click() on the cart accessibility
+        # container completed without navigation (BrowserStack screenshot,
+        # run 41824169357). Tap its on-screen center using XCUITest instead.
+        platform = str(self.driver.capabilities.get("platformName", "")).lower()
+        if platform == "ios":
+            element = self.visible("cart_button")
+            rect = element.rect
+            self.driver.execute_script("mobile: tap", {
+                "x": int(rect["x"] + rect["width"] / 2),
+                "y": int(rect["y"] + rect["height"] / 2),
+            })
+        else:
+            self.tap("cart_button")
 
 
 class CartScreen(BaseScreen):
