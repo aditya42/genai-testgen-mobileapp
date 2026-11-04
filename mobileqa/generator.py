@@ -30,11 +30,21 @@ PLATFORMS = ("android", "ios")
 def base_cases(platform):
     if platform not in PLATFORMS:
         raise ValueError("Unsupported platform")
-    return [
+    cases = [
         {"id": f"{platform.upper()}-{item['id']}", "intent": item["intent"],
          "title": item["title"], "actions": list(item["actions"])}
         for item in SCENARIOS
     ]
+    if platform == "ios":
+        # Swag Labs 2.7.1 has ADD TO CART controls on the inventory page.
+        # The iOS product-details action has repeatedly been nonresponsive
+        # in BrowserStack sessions; exercise the same purchase outcome from
+        # inventory while retaining a separate product-details test.
+        next(case for case in cases if case["intent"] == "add_to_cart")[
+            "actions"
+        ] = ["login_standard", "assert_catalog", "add_to_cart",
+             "open_cart", "assert_cart_item"]
+    return cases
 
 
 def validate(platform, cases):

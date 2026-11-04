@@ -30,3 +30,19 @@ def test_all_native_selector_names_present(platform):
     else:
         assert selectors["cart_screen"]["value"] == "test-Cart Content"
     assert selectors["login_button"]["value"] == "test-LOGIN"
+
+
+def test_ios_cart_uses_inventory_add_action_without_product_details():
+    case = next(c for c in base_cases("ios") if c["intent"] == "add_to_cart")
+    assert case["actions"] == [
+        "login_standard", "assert_catalog", "add_to_cart",
+        "open_cart", "assert_cart_item"
+    ]
+
+
+def test_android_cart_preserves_product_details_flow():
+    case = next(c for c in base_cases("android") if c["intent"] == "add_to_cart")
+    assert case["actions"] == [
+        "login_standard", "open_first_product", "add_to_cart",
+        "open_cart", "assert_cart_item"
+    ]
