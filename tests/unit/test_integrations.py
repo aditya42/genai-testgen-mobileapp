@@ -7,6 +7,10 @@ from mobileqa import integrations
 
 def fake_report(platform):
     return {"platform": platform, "cases": [
+        {"id": f"{platform.upper()}-LOGIN-001",
+         "status": "passed", "attempts": [{"status": "passed", "error": ""}]},
+        {"id": f"{platform.upper()}-LOGIN-002",
+         "status": "passed", "attempts": [{"status": "passed", "error": ""}]},
         {"id": f"{platform.upper()}-CATALOG-001",
          "status": "passed", "attempts": [{"status": "passed", "error": ""}]},
         {"id": f"{platform.upper()}-PRODUCT-001",
@@ -17,7 +21,7 @@ def fake_report(platform):
 
 
 @pytest.mark.parametrize("platform", ["android", "ios"])
-def test_testrail_publishes_three_platform_cases(platform, monkeypatch):
+def test_testrail_publishes_five_platform_cases(platform, monkeypatch):
     monkeypatch.setenv("TESTRAIL_PROJECT_ID", "1")
     monkeypatch.setenv("TESTRAIL_SECTION_ID", "1")
     monkeypatch.setenv("GITHUB_RUN_ID", "unit-run")
@@ -46,9 +50,9 @@ def test_testrail_publishes_three_platform_cases(platform, monkeypatch):
                         .base_cases(value))
     run_id, mapping = integrations.publish_testrail(platform, fake_report(platform))
     assert run_id == 42
-    assert len(mapping) == 3
-    assert len([call for call in calls if call[0].startswith("add_case/")]) == 3
-    assert len([call for call in calls if call[0].startswith("add_result_for_case/")]) == 3
+    assert len(mapping) == 5
+    assert len([call for call in calls if call[0].startswith("add_case/")]) == 5
+    assert len([call for call in calls if call[0].startswith("add_result_for_case/")]) == 5
     posted = next(call[2] for call in calls if call[0] == "add_run/1")
     assert "GitHub" not in posted["name"]
     assert "unit-run" in posted["description"]

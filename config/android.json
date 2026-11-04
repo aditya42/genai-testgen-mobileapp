@@ -1,9 +1,47 @@
 {
-  "_note": "Provisional: confirm accessibility IDs using Appium Inspector and the exact uploaded APK.",
-  "catalog": {"by": "accessibility id", "value": "test-PRODUCTS"},
-  "first_product": {"by": "accessibility id", "value": "test-Item"},
-  "product_detail": {"by": "accessibility id", "value": "test-Description"},
-  "add_to_cart": {"by": "accessibility id", "value": "test-ADD TO CART"},
-  "cart_button": {"by": "accessibility id", "value": "test-Cart"},
-  "cart_item": {"by": "accessibility id", "value": "test-Cart Item"}
+  "_note": "Swag Labs Mobile Sample 2.7.1 ANDROID locator candidates. iOS JS bundle defines test- accessibility IDs/labels; inspect real-device UI hierarchy before treating these as validated.",
+  "username": {
+    "by": "accessibility id",
+    "value": "test-Username"
+  },
+  "password": {
+    "by": "accessibility id",
+    "value": "test-Password"
+  },
+  "login_button": {
+    "by": "accessibility id",
+    "value": "test-LOGIN"
+  },
+  "login_error": {
+    "by": "accessibility id",
+    "value": "test-Error message"
+  },
+  "catalog": {
+    "by": "accessibility id",
+    "value": "test-PRODUCTS"
+  },
+  "first_product": {
+    "by": "accessibility id",
+    "value": "test-Item"
+  },
+  "product_detail": {
+    "by": "accessibility id",
+    "value": "test-Description"
+  },
+  "add_to_cart": {
+    "by": "accessibility id",
+    "value": "test-ADD TO CART"
+  },
+  "cart_button": {
+    "by": "accessibility id",
+    "value": "test-Cart"
+  },
+  "cart_screen": {
+    "by": "accessibility id",
+    "value": "test-Cart Content"
+  },
+  "cart_item": {
+    "by": "accessibility id",
+    "value": "test-Item"
+  }
 }

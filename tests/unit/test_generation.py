@@ -8,7 +8,7 @@ from mobileqa.generator import base_cases, generate, load_plan, save_plan, valid
 @pytest.mark.parametrize("platform", ["android", "ios"])
 def test_bounded_generation(platform):
     cases = generate(platform, "mock")
-    assert len(cases) == 3
+    assert len(cases) == 5
     assert all(item["id"].startswith(platform.upper() + "-") for item in cases)
     assert cases == base_cases(platform)
 
@@ -37,7 +37,7 @@ def test_rejects_duplicate_scenarios():
 
 def test_no_openai_token_required_for_mock(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    assert len(generate("ios", "mock")) == 3
+    assert len(generate("ios", "mock")) == 5
 
 
 def test_openai_needs_api_key(monkeypatch):

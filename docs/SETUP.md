@@ -2,9 +2,7 @@
 
 ## Upload test app binaries
 
-Use an Android APK and a real-device-compatible iOS IPA from the **same
-revision** of the [Sauce Labs My Demo App React Native project](https://github.com/saucelabs/my-demo-app-rn/releases).
-A simulator-only `.app` bundle is not a substitute for a real-device IPA.
+Use the Swag Labs Mobile Sample **2.7.1** Android APK and **2.7.1** real-device IPA uploaded for this project. The binary inspection confirmed the iOS bundle name `SwagLabsMobileApp` and version `2.7.1`. The application starts on the Login screen; all catalog/cart cases must authenticate first.
 
 Upload the APK and IPA separately to BrowserStack App Automate. Save the
 returned `bs://` identifiers under the names:
@@ -65,3 +63,7 @@ There is no automatic deletion of historical TestRail runs.
 Jira tickets are eligible only for two failed application assertions with
 no detected infrastructure problem. Tickets are labeled
 `needs-triage`; they are **candidates**, not established product defects.
+
+## Swag Labs Mobile Sample 2.7.1 selector provenance
+
+The uploaded iOS `.ipa` contains `Payload/SwagLabsMobileApp.app/main.jsbundle`. Its embedded English localization declares `Username`, `Password`, `LOGIN`, `PRODUCTS`, `Item`, `Description`, `ADD TO CART`, `Cart Content` and `Cart`. Its `testProperties()` helper prefixes accessibility IDs/labels with `test-` for iOS/Android. The selector configuration therefore uses these evidence-backed candidates, **not** the previous fictitious `test-Cart Item` identifier. Neither archive inspection nor unit tests can establish a particular element's live hierarchy or whether it is interactable: confirm on BrowserStack and update platform-specific JSON as needed.

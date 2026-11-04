@@ -7,15 +7,22 @@ import urllib.request
 from pathlib import Path
 
 SCENARIOS = (
+    {"id": "LOGIN-001", "intent": "valid_login",
+     "title": "Standard user signs in and sees the Swag Labs inventory",
+     "actions": ["login_standard", "assert_catalog"]},
+    {"id": "LOGIN-002", "intent": "invalid_password",
+     "title": "Swag Labs rejects an invalid password",
+     "actions": ["login_invalid_password", "assert_invalid_login_error"]},
     {"id": "CATALOG-001", "intent": "catalog_visible",
-     "title": "App launches and displays the product catalog",
-     "actions": ["assert_catalog"]},
+     "title": "Authenticated user sees the Swag Labs product inventory",
+     "actions": ["login_standard", "assert_catalog"]},
     {"id": "PRODUCT-001", "intent": "product_details",
-     "title": "Tapping a product opens its details",
-     "actions": ["open_first_product", "assert_product_details"]},
+     "title": "Authenticated user opens the product detail screen",
+     "actions": ["login_standard", "open_first_product", "assert_product_details"]},
     {"id": "CART-001", "intent": "add_to_cart",
-     "title": "Adding a product displays the item in the cart",
-     "actions": ["open_first_product", "add_to_cart", "open_cart", "assert_cart_item"]},
+     "title": "Authenticated user adds a product and sees it in the cart",
+     "actions": ["login_standard", "open_first_product", "add_to_cart",
+                 "open_cart", "assert_cart_item"]},
 )
 PLATFORMS = ("android", "ios")
 

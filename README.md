@@ -40,9 +40,9 @@ config/
 
 ## App under test
 
-Start with [Sauce Labs My Demo App (React Native)](https://github.com/saucelabs/my-demo-app-rn/releases), an open-source sample shopping application. Upload its **Android APK** and a **real-device-compatible iOS IPA** to [BrowserStack App Automate](https://app-automate.browserstack.com/); use the two resulting `bs://` identifiers. The app builds are **not** committed.
+Use the uploaded **Android.SauceLabs.Mobile.Sample.app.2.7.1.apk** and **iOS.RealDevice.SauceLabs.Mobile.Sample.app.2.7.1.ipa** binaries (Swag Labs Mobile Sample v2.7.1) as the target applications. Upload its **Android APK** and a **real-device-compatible iOS IPA** to [BrowserStack App Automate](https://app-automate.browserstack.com/); use the two resulting `bs://` identifiers. The app builds are **not** committed.
 
-The initial tests cover **catalog visibility, opening a product detail, and adding an item to the cart** on each OS. Selector IDs in `config/android.json` and `config/ios.json` are *starting points*; confirm them using Appium Inspector against the exact uploaded app versions. The repo does not claim cloud test passes until this is done.
+The initial tests cover **valid login, invalid password, authenticated catalog visibility, product details, and add-to-cart** on each OS. Both uploaded files are **Swag Labs Mobile Sample 2.7.1**, which starts on a login screen. Locator candidates are grounded in the bundled iOS JavaScript localization/test-property definitions but still require verification using an actual device UI hierarchy. Selector IDs in `config/android.json` and `config/ios.json` are *starting points*; confirm them using Appium Inspector against the exact uploaded app versions. The repo does not claim cloud test passes until this is done.
 
 ## Required GitHub Actions secrets
 
