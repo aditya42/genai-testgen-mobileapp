@@ -50,6 +50,7 @@ def test_cart_action_scrolls_once_when_initially_offscreen(platform, direction):
         "by": "accessibility id", "value": "test-ADD TO CART"
     }})
     button = Mock()
+    button.rect = {"x": 25, "y": 267, "width": 340, "height": 41}
     with patch("mobileqa.pages.WebDriverWait") as waiter:
         waiter.return_value.until.side_effect = (
             [TimeoutException(), button, Mock()] if platform == "iOS"
