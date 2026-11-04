@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from mobileqa.pages import LoginScreen, ProductScreen
+from appium.webdriver.common.appiumby import AppiumBy
 
 
 def test_login_error_uses_native_content_description_when_text_is_empty():
@@ -95,20 +96,20 @@ def test_cart_asserts_product_without_relying_on_screen_header():
     visible.assert_called_once_with("cart_item")
 
 
-def test_ios_cart_uses_native_center_tap():
+def test_ios_cart_clicks_nested_actionable_child():
     driver = Mock()
     driver.capabilities = {"platformName": "iOS"}
-    button = Mock()
-    button.rect = {"x": 300, "y": 25, "width": 50, "height": 60}
+    parent = Mock()
+    child = Mock()
+    parent.find_element.return_value = child
     screen = ProductScreen(driver, {"cart_button": {
         "by": "accessibility id", "value": "test-Cart"
     }})
-    with patch.object(screen, "visible", return_value=button):
+    with patch.object(screen, "visible", return_value=parent):
         screen.open_cart()
-    driver.execute_script.assert_called_once_with(
-        "mobile: tap", {"x": 325, "y": 55}
-    )
-    button.click.assert_not_called()
+    parent.find_element.assert_called_once_with(AppiumBy.XPATH, "./*")
+    child.click.assert_called_once()
+    driver.execute_script.assert_not_called()
 
 
 def test_android_cart_keeps_element_click():
@@ -119,3 +120,18 @@ def test_android_cart_keeps_element_click():
         screen.open_cart()
     tap.assert_called_once_with("cart_button")
     driver.execute_script.assert_not_called()
+
+
+def test_ios_requires_remove_state_after_add_to_cart():
+    driver = Mock()
+    driver.capabilities = {"platformName": "iOS"}
+    screen = ProductScreen(driver, {"add_to_cart": {
+        "by": "accessibility id", "value": "test-ADD TO CART"
+    }})
+    button = Mock()
+    with patch("mobileqa.pages.WebDriverWait") as waiter:
+        waiter.return_value.until.side_effect = [button, Mock()]
+        screen.add_to_cart()
+    button.click.assert_called_once()
+    assert waiter.return_value.until.call_count == 2
+    assert "test-REMOVE" in str(waiter.return_value.until.call_args)
