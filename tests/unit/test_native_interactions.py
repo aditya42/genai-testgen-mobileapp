@@ -93,3 +93,29 @@ def test_cart_asserts_product_without_relying_on_screen_header():
     with patch.object(screen, "visible", return_value=item) as visible:
         screen.assert_item()
     visible.assert_called_once_with("cart_item")
+
+
+def test_ios_cart_uses_native_center_tap():
+    driver = Mock()
+    driver.capabilities = {"platformName": "iOS"}
+    button = Mock()
+    button.rect = {"x": 300, "y": 25, "width": 50, "height": 60}
+    screen = ProductScreen(driver, {"cart_button": {
+        "by": "accessibility id", "value": "test-Cart"
+    }})
+    with patch.object(screen, "visible", return_value=button):
+        screen.open_cart()
+    driver.execute_script.assert_called_once_with(
+        "mobile: tap", {"x": 325, "y": 55}
+    )
+    button.click.assert_not_called()
+
+
+def test_android_cart_keeps_element_click():
+    driver = Mock()
+    driver.capabilities = {"platformName": "Android"}
+    screen = ProductScreen(driver, {})
+    with patch.object(screen, "tap") as tap:
+        screen.open_cart()
+    tap.assert_called_once_with("cart_button")
+    driver.execute_script.assert_not_called()

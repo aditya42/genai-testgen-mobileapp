@@ -72,6 +72,16 @@ def pytest_runtest_makereport(item, call):
                 filename = folder / f"{case_id}-{len(ATTEMPTS[case_id])}.png"
                 session.save_screenshot(str(filename))
                 attempt["screenshot"] = str(filename)
+                # Targeted iOS cart diagnostics: preserve the actual accessible
+                # element names rather than guessing another selector. Never
+                # capture a login page or persist demo credentials.
+                if case_id == "IOS-CART-001":
+                    source = session.page_source
+                    for secret in ("secret_sauce", "invalid_password"):
+                        source = source.replace(secret, "[REDACTED]")
+                    hierarchy = filename.with_suffix(".xml")
+                    hierarchy.write_text(source[:500_000], encoding="utf-8")
+                    attempt["hierarchy"] = str(hierarchy)
             except Exception:
                 pass
 
