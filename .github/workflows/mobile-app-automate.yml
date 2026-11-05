@@ -49,14 +49,14 @@ jobs:
       BROWSERSTACK_ANDROID_APP_ID: ${{ secrets.BROWSERSTACK_ANDROID_APP_ID }}
       BROWSERSTACK_IOS_APP_ID: ${{ secrets.BROWSERSTACK_IOS_APP_ID }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      TESTRAIL_URL: ${{ vars.TESTRAIL_URL }}
-      TESTRAIL_PROJECT_ID: ${{ vars.TESTRAIL_PROJECT_ID }}
-      TESTRAIL_SECTION_ID: ${{ vars.TESTRAIL_SECTION_ID }}
-      TESTRAIL_SUITE_ID: ${{ vars.TESTRAIL_SUITE_ID }}
+      TESTRAIL_URL: ${{ vars.TESTRAIL_URL || secrets.TESTRAIL_URL }}
+      TESTRAIL_PROJECT_ID: ${{ vars.TESTRAIL_PROJECT_ID || secrets.TESTRAIL_PROJECT_ID }}
+      TESTRAIL_SECTION_ID: ${{ vars.TESTRAIL_SECTION_ID || secrets.TESTRAIL_SECTION_ID }}
+      TESTRAIL_SUITE_ID: ${{ vars.TESTRAIL_SUITE_ID || secrets.TESTRAIL_SUITE_ID }}
       TESTRAIL_EMAIL: ${{ secrets.TESTRAIL_EMAIL }}
       TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
-      JIRA_URL: ${{ vars.JIRA_URL }}
-      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+      JIRA_URL: ${{ vars.JIRA_URL || secrets.JIRA_URL }}
+      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || secrets.JIRA_PROJECT_KEY }}
       JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
       JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
       BROWSERSTACK_BUILD_NAME: Mobile Regression - ${{ github.run_number }}
