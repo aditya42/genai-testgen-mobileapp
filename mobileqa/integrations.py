@@ -141,6 +141,14 @@ def _adf(text):
     }]}
 
 
+def preview_jira_candidates(platform, report):
+    """Offline preview: never contact Jira or create a ticket."""
+    return [
+        case["id"] for case in report["cases"]
+        if case["status"] == "failed" and jira_eligible(case["attempts"])
+    ]
+
+
 def publish_jira_candidates(platform, report, run_id=None, mapping=None):
     project = os.environ["JIRA_PROJECT_KEY"]
     candidates = []
@@ -184,14 +192,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform", choices=("android", "ios"), required=True)
     parser.add_argument("--testrail", action="store_true")
-    parser.add_argument("--jira", action="store_true")
+    parser.add_argument("--jira", action="store_true",
+                        help="Create/reuse Jira review issues")
+    parser.add_argument("--jira-preview", action="store_true",
+                        help="Preview eligible cases without contacting Jira")
     args = parser.parse_args()
     report = load_results(args.platform)
     run_id, mapping = (None, {})
     if args.testrail:
         run_id, mapping = publish_testrail(args.platform, report)
+    if args.jira and args.jira_preview:
+        parser.error("--jira and --jira-preview cannot be used together")
+    preview = preview_jira_candidates(args.platform, report) if args.jira_preview else []
     jira_keys = publish_jira_candidates(args.platform, report, run_id, mapping) if args.jira else []
-    outcome = {"platform": args.platform, "testrail_run": run_id, "jira_candidates": jira_keys,
+    outcome = {"platform": args.platform, "testrail_run": run_id,
+               "jira_candidates": jira_keys, "jira_preview": preview,
                "passed": sum(r["status"] == "passed" for r in report["cases"]),
                "failed": sum(r["status"] == "failed" for r in report["cases"])}
     print(json.dumps(outcome))
@@ -203,6 +218,7 @@ def main():
                 f"- Passed: {outcome['passed']}\n- Failed: {outcome['failed']}\n"
                 f"- TestRail run: {run_id or 'not published'}\n"
                 f"- Jira candidates: {', '.join(jira_keys) or 'none'}\n"
+                f"- Jira preview (no issues created): {', '.join(preview) or 'none'}\n"
             )
 
 
