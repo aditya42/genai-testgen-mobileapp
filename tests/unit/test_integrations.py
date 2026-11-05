@@ -106,7 +106,6 @@ def test_repeated_assertion_creates_review_candidate(monkeypatch):
 
 
 def test_jira_preview_is_read_only(monkeypatch):
-    import os
     monkeypatch.delenv("JIRA_PROJECT_KEY", raising=False)
     monkeypatch.setattr(integrations, "jira",
                         lambda *args, **kwargs: pytest.fail("Preview contacted Jira"))
