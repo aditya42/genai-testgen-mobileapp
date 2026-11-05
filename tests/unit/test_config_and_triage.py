@@ -59,3 +59,20 @@ def test_setup_failures_are_not_jira_eligible():
     failed = {"status": "failed", "phase": "setup",
               "error": "AssertionError: app was not launched"}
     assert not jira_eligible([failed, failed])
+
+
+def test_full_pytest_traceback_assertion_is_eligible_across_sessions():
+    from mobileqa.triage import jira_eligible
+
+    def traceback(session):
+        return (
+            f'driver = <appium.webdriver.WebDriver (session="{session}")>\\n'
+            '>       assert not observed\\n'
+            'E       AssertionError: Intentional Jira E2E validation: catalog was visible\\n'
+            'E       assert not True\\n'
+            'tests/jira_validation/test_assertion.py:19: AssertionError'
+        )
+
+    first = {"status": "failed", "phase": "call", "error": traceback("abc")}
+    second = {"status": "failed", "phase": "call", "error": traceback("def")}
+    assert jira_eligible([first, second])

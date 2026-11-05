@@ -18,7 +18,11 @@ def _assertion_detail(error):
         content = line.strip()
         match = re.search(r"(?:AssertionError:|AssertionError\b)(.*)", content, re.I)
         if match:
-            return re.sub(r"\s+", " ", match.group(1)).strip().lower()
+            detail = re.sub(r"\s+", " ", match.group(1)).strip().lower()
+            # Pytest often ends a traceback with "file.py:19: AssertionError"
+            # after an earlier "E AssertionError: actual message" line.
+            if detail:
+                return detail
     return ""
 
 
