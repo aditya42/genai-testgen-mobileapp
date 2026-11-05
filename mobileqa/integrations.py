@@ -157,8 +157,11 @@ def publish_jira_candidates(platform, report, run_id=None, mapping=None, *, smok
         if case["status"] != "failed" or not jira_eligible(case["attempts"]):
             continue
         case_id = case["id"]
-        if smoke and case_id != f"{platform.upper()}-JIRA-SMOKE-001":
-            raise ValueError("Jira smoke mode accepts only its synthetic case")
+        if smoke and case_id not in {
+            f"{platform.upper()}-JIRA-SMOKE-001",
+            f"{platform.upper()}-JIRA-ASSERT-001",
+        }:
+            raise ValueError("Jira smoke mode accepts only synthetic validation cases")
         label = "genai-mobile-" + case_id.lower()
         existing = jira("search/jql", params={
             "jql": f'project = "{project}" AND labels = "{label}"',
@@ -275,6 +278,79 @@ def verify_jira_live(platform):
     return outcome
 
 
+def verify_jira_assertion_live(platform):
+    """Confirm a real Appium assertion failure creates and reuses a Jira issue.
+
+    The assertion is deliberately inverted in an isolated test; never label it
+    as an application defect or put it into the normal regression plan.
+    """
+    if os.getenv("JIRA_LIVE_SMOKE_CONFIRM") != "YES":
+        raise ValueError("Live Jira assertion verification requires explicit confirmation")
+    for key in ("JIRA_URL", "JIRA_PROJECT_KEY", "JIRA_EMAIL", "JIRA_API_TOKEN"):
+        if not os.getenv(key):
+            raise ValueError(f"Missing {key}")
+    case_id = f"{platform.upper()}-JIRA-ASSERT-001"
+    report = load_results(platform)
+    if len(report["cases"]) != 1 or report["cases"][0]["id"] != case_id:
+        raise ValueError("Expected exactly the isolated Jira assertion validation case")
+    case = report["cases"][0]
+    if case["status"] != "failed" or not jira_eligible(case["attempts"]):
+        raise ValueError("Two matching failed Appium assertions were not observed")
+    label = "genai-mobile-" + case_id.lower()
+    project = os.environ["JIRA_PROJECT_KEY"]
+
+    def matched():
+        return jira("search/jql", params={
+            "jql": f'project = "{project}" AND labels = "{label}"',
+            "maxResults": 2, "fields": "key",
+        }).get("issues", [])
+
+    previous = matched()
+    if previous:
+        raise RuntimeError("Assertion validation issue already exists; expected first-time creation")
+    first = publish_jira_candidates(platform, report, smoke=True)
+    if len(first) != 1:
+        raise RuntimeError("Did not create exactly one Jira assertion validation issue")
+    key = first[0]
+    details = jira(f"issue/{key}").get("fields", {})
+    if label not in details.get("labels", []):
+        raise RuntimeError("Created issue missing stable deduplication label")
+    if not details.get("summary", "").startswith("[INTEGRATION TEST - NOT A DEFECT]"):
+        raise RuntimeError("Created issue missing the intentional-failure warning")
+
+    for _ in range(8):
+        issues = matched()
+        if len(issues) == 1 and issues[0]["key"] == key:
+            break
+        if len(issues) > 1:
+            raise RuntimeError("Multiple matching Jira validation tickets exist")
+        time.sleep(5)
+    else:
+        raise RuntimeError("New Jira issue not indexed for duplicate reuse check")
+    reused = publish_jira_candidates(platform, report, smoke=True)
+    if reused != first:
+        raise RuntimeError("Repeated failure did not reuse the same Jira issue")
+    if len(matched()) != 1:
+        raise RuntimeError("Duplicate Jira validation issue detected")
+    outcome = {
+        "platform": platform, "case": case_id, "attempts": len(case["attempts"]),
+        "issue": key, "first_publish": "created", "second_publish": "reused",
+        "duplicates": 0, "intentional_failure": True,
+    }
+    summary = os.getenv("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as handle:
+            handle.write(
+                "### Real Appium assertion -> Jira integration validation\n"
+                "- Assertion: intentionally inverted; NOT a product defect\n"
+                f"- Appium attempts: {len(case['attempts'])} failed\n"
+                f"- Jira issue: {key}\n"
+                "- First publish: created\n- Second publish: reused\n"
+                "- Duplicate issues: 0\n"
+            )
+    return outcome
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform", choices=("android", "ios"), required=True)
@@ -285,7 +361,14 @@ def main():
                         help="Preview eligible cases without contacting Jira")
     parser.add_argument("--verify-jira-live", action="store_true",
                         help="Explicit live synthetic Jira create/reuse verification")
+    parser.add_argument("--verify-jira-assertion-live", action="store_true",
+                        help="Verify one deliberately failed Appium assertion reaches Jira")
     args = parser.parse_args()
+    if args.verify_jira_assertion_live:
+        if args.testrail or args.jira or args.jira_preview or args.verify_jira_live:
+            parser.error("--verify-jira-assertion-live must be run alone")
+        print(json.dumps(verify_jira_assertion_live(args.platform)))
+        return
     if args.verify_jira_live:
         if args.testrail or args.jira or args.jira_preview:
             parser.error("--verify-jira-live must be run alone")

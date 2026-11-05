@@ -118,3 +118,23 @@ On the first execution, expect `created one smoke issue` followed by
 same existing issue. **A real Jira issue remains in the project** so reviewers
 can inspect it; do not treat it as an actual product defect. No API token
 or synthetic failure is inserted into the mobile regression suite.
+
+## One-time end-to-end Appium assertion failure -> Jira issue validation
+
+A deliberately incorrect assertion is isolated under
+`tests/jira_validation/test_assertion.py`. It first logs in on a real iOS
+BrowserStack device and confirms the actual product inventory is displayed.
+It then intentionally expects that same catalog to be hidden, producing a
+real, repeatable `AssertionError` twice. **This is a deliberately incorrect
+test oracle, not an actual app defect.**
+
+The one-time workflow `.github/workflows/jira-assertion-e2e.yml` executes
+only when the integration-verification workflow file is committed with its
+exact trigger message. It skips the production regression plan and TestRail.
+The Jira ticket has the stable identifier `IOS-JIRA-ASSERT-001` and the
+labels `integration-test` and `genai-mobile-ios-jira-assert-001`; it is
+**not** labeled `needs-triage`. The verifier requires two failed Appium
+assertions, creates one real Jira issue, confirms its metadata and searches
+for it, then republishes and verifies the issue key is reused. The job
+succeeds only if all those checks pass; the two deliberate pytest failures
+are captured in CI and evidence artifacts.

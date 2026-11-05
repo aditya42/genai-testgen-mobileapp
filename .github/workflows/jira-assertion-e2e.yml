@@ -1,0 +1,57 @@
+name: One-time real Appium assertion to Jira verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jira-assertion-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-assertion-jira:
+    if: ${{ github.event.head_commit.message == 'test(jira): execute controlled real Appium assertion verification' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      MOBILE_PLATFORM: ios
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      BROWSERSTACK_IOS_APP_ID: ${{ secrets.BROWSERSTACK_IOS_APP_ID }}
+      JIRA_URL: ${{ vars.JIRA_URL || secrets.JIRA_URL }}
+      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || secrets.JIRA_PROJECT_KEY }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_LIVE_SMOKE_CONFIRM: YES
+      BROWSERSTACK_BUILD_NAME: Controlled Jira Assertion Verification
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Execute twice-failing real-device assertion (intentional failure)
+        id: appium
+        continue-on-error: true
+        run: |
+          python -m pytest tests/jira_validation/test_assertion.py -v --reruns 1 --reruns-delay 1 \
+            --junitxml=reports/ios/junit.xml
+      - name: Assert Appium failed and create/reuse Jira review issue
+        if: ${{ steps.appium.outcome == 'failure' }}
+        run: python -m mobileqa.integrations --platform ios --verify-jira-assertion-live
+      - name: Fail if expected Appium failure did not happen
+        if: ${{ steps.appium.outcome != 'failure' }}
+        run: |
+          echo "::error::Expected two failed Appium assertions, but pytest did not fail."
+          exit 1
+      - name: Upload Appium assertion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jira-assertion-evidence-${{ github.run_id }}
+          path: |
+            reports/ios/
+            screenshots/ios/
+          if-no-files-found: ignore

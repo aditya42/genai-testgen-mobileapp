@@ -220,3 +220,65 @@ def test_live_jira_smoke_reuses_prior_ticket(monkeypatch):
     outcome = integrations.verify_jira_live("ios")
     assert outcome["first_pass"] == "reused existing smoke issue"
     assert outcome["second_pass"] == "reused same issue"
+
+
+
+def test_real_appium_assertion_verification_creates_and_reuses(monkeypatch):
+    monkeypatch.setenv("JIRA_LIVE_SMOKE_CONFIRM", "YES")
+    for name, value in {
+        "JIRA_URL": "https://example.atlassian.net",
+        "JIRA_PROJECT_KEY": "KAN",
+        "JIRA_EMAIL": "qa@example.com",
+        "JIRA_API_TOKEN": "fake",
+    }.items():
+        monkeypatch.setenv(name, value)
+    failed = {
+        "status": "failed", "phase": "call",
+        "error": "AssertionError: Intentional Jira E2E validation: catalog was visible",
+    }
+    monkeypatch.setattr(integrations, "load_results", lambda platform: {
+        "platform": platform, "cases": [
+            {"id": "IOS-JIRA-ASSERT-001", "status": "failed",
+             "attempts": [failed, failed]},
+        ],
+    })
+    created = []
+
+    def fake_jira(path, method="GET", payload=None, params=None):
+        if path == "search/jql":
+            return {"issues": [{"key": "KAN-101"}] if created else []}
+        if path == "project/KAN":
+            return {"issueTypes": [{"id": "10001", "name": "Bug"}]}
+        if path == "issue" and method == "POST":
+            assert "integration-test" in payload["fields"]["labels"]
+            assert "needs-triage" not in payload["fields"]["labels"]
+            created.append(payload)
+            return {"key": "KAN-101"}
+        if path == "issue/KAN-101":
+            return {"fields": {
+                "summary": "[INTEGRATION TEST - NOT A DEFECT][IOS] IOS-JIRA-ASSERT-001",
+                "labels": ["integration-test", "genai-mobile-ios-jira-assert-001"],
+            }}
+        pytest.fail(f"Unexpected Jira request {method} {path}")
+
+    monkeypatch.setattr(integrations, "jira", fake_jira)
+    outcome = integrations.verify_jira_assertion_live("ios")
+    assert outcome["issue"] == "KAN-101"
+    assert outcome["duplicates"] == 0
+    assert len(created) == 1
+
+
+def test_real_appium_assertion_verification_rejects_nonfailures(monkeypatch):
+    monkeypatch.setenv("JIRA_LIVE_SMOKE_CONFIRM", "YES")
+    for name in ("JIRA_URL", "JIRA_PROJECT_KEY", "JIRA_EMAIL", "JIRA_API_TOKEN"):
+        monkeypatch.setenv(name, "test")
+    monkeypatch.setattr(integrations, "load_results", lambda platform: {
+        "platform": platform, "cases": [
+            {"id": "IOS-JIRA-ASSERT-001", "status": "passed",
+             "attempts": [{"status": "passed", "error": ""}]},
+        ],
+    })
+    monkeypatch.setattr(integrations, "jira",
+                        lambda *args, **kwargs: pytest.fail("Unexpected Jira call"))
+    with pytest.raises(ValueError, match="Two matching failed Appium assertions"):
+        integrations.verify_jira_assertion_live("ios")
