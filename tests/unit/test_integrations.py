@@ -102,3 +102,51 @@ def test_repeated_assertion_creates_review_candidate(monkeypatch):
     assert integrations.publish_jira_candidates("ios", report, 44, {}) == ["KAN-22"]
     assert "needs-triage" in posted[0]["fields"]["labels"]
     assert "IOS-CART-001" in posted[0]["fields"]["summary"]
+
+
+
+def test_jira_preview_is_read_only(monkeypatch):
+    import os
+    monkeypatch.delenv("JIRA_PROJECT_KEY", raising=False)
+    monkeypatch.setattr(integrations, "jira",
+                        lambda *args, **kwargs: pytest.fail("Preview contacted Jira"))
+    failed = {"status": "failed", "error": "AssertionError: wrong cart quantity"}
+    report = {"cases": [
+        {"id": "ANDROID-CART-001", "status": "failed",
+         "attempts": [failed, failed]},
+        {"id": "ANDROID-PRODUCT-001", "status": "passed",
+         "attempts": [{"status": "passed", "error": ""}]},
+    ]}
+    assert integrations.preview_jira_candidates("android", report) == [
+        "ANDROID-CART-001"
+    ]
+
+
+def test_existing_jira_issue_reused_without_creating_duplicate(monkeypatch):
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "KAN")
+    failed = {"status": "failed", "error": "AssertionError: quantity mismatch"}
+    report = {"cases": [{"id": "IOS-CART-001", "status": "failed",
+                          "attempts": [failed, failed]}]}
+    requested = []
+
+    def fake_jira(path, method="GET", payload=None, params=None):
+        requested.append((path, method, params))
+        if path == "search/jql":
+            assert 'genai-mobile-ios-cart-001' in params["jql"]
+            return {"issues": [{"key": "KAN-22"}]}
+        pytest.fail(f"Unexpected Jira request: {method} {path}")
+
+    monkeypatch.setattr(integrations, "jira", fake_jira)
+    assert integrations.publish_jira_candidates("ios", report) == ["KAN-22"]
+    assert len(requested) == 1
+
+
+def test_infrastructure_failure_never_queries_jira(monkeypatch):
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "KAN")
+    monkeypatch.setattr(integrations, "jira",
+                        lambda *args, **kwargs: pytest.fail("Jira must not be called"))
+    failed = {"status": "failed",
+              "error": "TimeoutException: No such element on Android"}
+    report = {"cases": [{"id": "ANDROID-CART-001", "status": "failed",
+                          "attempts": [failed, failed]}]}
+    assert integrations.publish_jira_candidates("android", report) == []

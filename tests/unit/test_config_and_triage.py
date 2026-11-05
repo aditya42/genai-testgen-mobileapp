@@ -40,3 +40,22 @@ def test_jira_eligible_only_for_repeated_assertions():
         {"status": "failed", "error": "Appium connection timed out"},
         {"status": "failed", "error": "Appium connection timed out"},
     ])
+
+
+
+def test_different_assertions_across_retries_are_not_eligible():
+    first = {"status": "failed", "error": "AssertionError: cart quantity 0"}
+    second = {"status": "failed", "error": "AssertionError: checkout error"}
+    assert not jira_eligible([first, second])
+
+
+def test_locator_failure_with_assertion_is_not_product_defect():
+    failed = {"status": "failed",
+              "error": "AssertionError: cart missing\\nNoSuchElementException: element not found"}
+    assert not jira_eligible([failed, failed])
+
+
+def test_setup_failures_are_not_jira_eligible():
+    failed = {"status": "failed", "phase": "setup",
+              "error": "AssertionError: app was not launched"}
+    assert not jira_eligible([failed, failed])
