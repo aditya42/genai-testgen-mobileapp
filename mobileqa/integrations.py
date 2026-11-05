@@ -175,14 +175,16 @@ def publish_jira_candidates(platform, report, run_id=None, mapping=None, *, smok
         last_error = case["attempts"][-1]["error"][:2500]
         prefix = ("SYNTHETIC JIRA INTEGRATION TEST, NOT A PRODUCT DEFECT."
                   if smoke else f"Repeated Appium assertion failure on {platform.upper()}.")
-        message = (prefix
+        message = (prefix +
                    f"\nRequirement: {case_id}"
                    f"\nTestRail run: {run_id or 'not published'}"
                    f"\nTestRail case: {(mapping or {}).get(case_id, 'unknown')}"
                    f"\nGitHub run: {os.getenv('GITHUB_RUN_ID', 'local')}"
                    f"\nBrowserStack App Automate logs are in cloud build."
                    f"\nFailure evidence:\n{last_error}"
-                   f"\nClassification: candidate product defect; requires human verification.")
+                   ("\nClassification: integration smoke test only; NOT A PRODUCT DEFECT."
+                    if smoke else
+                    "\nClassification: candidate product defect; requires human verification."))
         body = {"fields": {
             "project": {"key": project}, "issuetype": {"id": str(bug["id"])},
             "summary": (
