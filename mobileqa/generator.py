@@ -35,15 +35,14 @@ def base_cases(platform):
          "title": item["title"], "actions": list(item["actions"])}
         for item in SCENARIOS
     ]
-    if platform == "ios":
-        # Swag Labs 2.7.1 has ADD TO CART controls on the inventory page.
-        # The iOS product-details action has repeatedly been nonresponsive
-        # in BrowserStack sessions; exercise the same purchase outcome from
-        # inventory while retaining a separate product-details test.
-        next(case for case in cases if case["intent"] == "add_to_cart")[
-            "actions"
-        ] = ["login_standard", "assert_catalog", "add_to_cart",
-             "open_cart", "assert_cart_item"]
+    # Swag Labs 2.7.1 exposes ADD TO CART on the inventory page.
+    # Product-details scrolling is unreliable on some real devices; exercise
+    # the user-facing cart outcome directly from inventory on both platforms.
+    # Product-details navigation remains covered by PRODUCT-001.
+    next(case for case in cases if case["intent"] == "add_to_cart")[
+        "actions"
+    ] = ["login_standard", "assert_catalog", "add_to_cart",
+         "open_cart", "assert_cart_item"]
     return cases
 
 
