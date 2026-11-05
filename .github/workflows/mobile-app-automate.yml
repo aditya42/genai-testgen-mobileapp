@@ -21,10 +21,16 @@ on:
         type: boolean
         default: false
       publish_jira:
-        description: File repeatable assertion failures as Jira review candidates
+        description: Enable Jira review candidates (preview unless create explicitly selected)
         required: true
         type: boolean
         default: false
+      jira_mode:
+        description: Preview without creating issues, or create/reuse review issues
+        required: true
+        type: choice
+        default: preview
+        options: [preview, create]
 
 permissions:
   contents: read
@@ -82,7 +88,7 @@ jobs:
             test -n "${!name}" || { echo "::error::Missing $name"; exit 1; }
           done
       - name: Validate Jira publishing configuration
-        if: inputs.publish_jira
+        if: inputs.publish_jira && inputs.jira_mode == 'create'
         run: |
           for name in JIRA_URL JIRA_PROJECT_KEY JIRA_EMAIL JIRA_API_TOKEN; do
             test -n "${!name}" || { echo "::error::Missing $name"; exit 1; }
@@ -102,10 +108,17 @@ jobs:
         env:
           PUBLISH_TESTRAIL: ${{ inputs.publish_testrail }}
           PUBLISH_JIRA: ${{ inputs.publish_jira }}
+          JIRA_MODE: ${{ inputs.jira_mode }}
         run: |
           args=(--platform "${MOBILE_PLATFORM}")
           if [ "$PUBLISH_TESTRAIL" = "true" ]; then args+=(--testrail); fi
-          if [ "$PUBLISH_JIRA" = "true" ]; then args+=(--jira); fi
+          if [ "$PUBLISH_JIRA" = "true" ]; then
+            if [ "$JIRA_MODE" = "create" ]; then
+              args+=(--jira)
+            else
+              args+=(--jira-preview)
+            fi
+          fi
           python -m mobileqa.integrations "${args[@]}"
       - name: Upload evidence and execution results
         if: always()
