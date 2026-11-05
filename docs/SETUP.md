@@ -67,3 +67,33 @@ no detected infrastructure problem. Tickets are labeled
 ## Swag Labs Mobile Sample 2.7.1 selector provenance
 
 The uploaded iOS `.ipa` contains `Payload/SwagLabsMobileApp.app/main.jsbundle`. Its embedded English localization declares `Username`, `Password`, `LOGIN`, `PRODUCTS`, `Item`, `Description`, `ADD TO CART`, `Cart Content` and `Cart`. Its `testProperties()` helper prefixes accessibility IDs/labels with `test-` for iOS/Android. The selector configuration therefore uses these evidence-backed candidates, **not** the previous fictitious `test-Cart Item` identifier. Neither archive inspection nor unit tests can establish a particular element's live hierarchy or whether it is interactable: confirm on BrowserStack and update platform-specific JSON as needed.
+
+## Jira defect review milestone
+
+Use **Actions → BrowserStack Android and iOS Appium → Run workflow**.
+
+1. Set `platform=both`, `provider=mock`, `publish_testrail=true`,
+   `publish_jira=true`, and `jira_mode=preview`. Preview checks
+   eligibility **without calling Jira or creating issues**. Review the
+   `Jira preview` section of each job's GitHub Actions summary.
+2. Only after reviewing a repeated, identical application assertion, set
+   `jira_mode=create` on a subsequent run. Both `JIRA_URL` and
+   `JIRA_PROJECT_KEY` must be configured as Actions variables or secrets,
+   together with `JIRA_EMAIL` and `JIRA_API_TOKEN` as secrets.
+3. Jira tickets are deliberately **review candidates**, labeled
+   `needs-triage`. Existing tickets are looked up using the stable
+   `genai-mobile-<platform>-<case-id>` label and reused instead of creating
+   a duplicate. A human must verify the application defect before assigning
+   it to an engineering team.
+
+Controls: a test must fail on at least two attempts with the same assertion.
+Passing-on-retry, setup failures, locator/timeout errors, and differing
+assertions are not eligible. A green run creates no Jira tickets. Enabling
+`publish_jira` alone never creates tickets because the default Jira mode is
+`preview`.
+
+The workflow refuses creation when required Jira configuration is missing.
+Publishing to TestRail is independent of Jira mode. Never add API tokens to
+the repository or log them. The initial Jira API integration is tested
+offline with mocked endpoints; a real Jira creation test remains a separate
+explicitly authorized step.
