@@ -1,4 +1,5 @@
 name: One-time real Appium assertion to Jira verification
+# Controlled recheck after validating full pytest assertion traceback parsing.
 
 on:
   push:
