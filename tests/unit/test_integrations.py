@@ -149,3 +149,74 @@ def test_infrastructure_failure_never_queries_jira(monkeypatch):
     report = {"cases": [{"id": "ANDROID-CART-001", "status": "failed",
                           "attempts": [failed, failed]}]}
     assert integrations.publish_jira_candidates("android", report) == []
+
+
+def test_live_jira_smoke_rejects_unconfirmed_execution(monkeypatch):
+    monkeypatch.delenv("JIRA_LIVE_SMOKE_CONFIRM", raising=False)
+    monkeypatch.setattr(integrations, "jira",
+                        lambda *args, **kwargs: pytest.fail("Unexpected Jira call"))
+    with pytest.raises(ValueError, match="explicit confirmation"):
+        integrations.verify_jira_live("ios")
+
+
+def test_live_jira_smoke_creates_and_reuses_one_issue(monkeypatch):
+    monkeypatch.setenv("JIRA_LIVE_SMOKE_CONFIRM", "YES")
+    monkeypatch.setenv("JIRA_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "KAN")
+    monkeypatch.setenv("JIRA_EMAIL", "fake@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "dummy")
+    created = []
+    lookups = []
+
+    def fake_jira(path, method="GET", payload=None, params=None):
+        if path == "search/jql":
+            lookups.append(params["jql"])
+            return {"issues": [{"key": "KAN-100"}] if created else []}
+        if path == "project/KAN":
+            return {"issueTypes": [{"id": "10001", "name": "Bug"}]}
+        if path == "issue" and method == "POST":
+            assert "[INTEGRATION TEST - NOT A DEFECT]" in payload["fields"]["summary"]
+            assert "integration-test" in payload["fields"]["labels"]
+            assert "needs-triage" not in payload["fields"]["labels"]
+            created.append(payload)
+            return {"key": "KAN-100"}
+        if path == "issue/KAN-100":
+            return {"fields": {
+                "summary": "[INTEGRATION TEST - NOT A DEFECT][IOS] IOS-JIRA-SMOKE-001",
+                "labels": ["integration-test", "genai-mobile-ios-jira-smoke-001"],
+            }}
+        pytest.fail(f"Unexpected Jira call: {method} {path}")
+
+    monkeypatch.setattr(integrations, "jira", fake_jira)
+    result = integrations.verify_jira_live("ios")
+    assert result["issue"] == "KAN-100"
+    assert result["duplicate_count"] == 0
+    assert len(created) == 1
+    assert len(lookups) >= 3
+    assert all('genai-mobile-ios-jira-smoke-001' in query for query in lookups)
+
+
+def test_live_jira_smoke_reuses_prior_ticket(monkeypatch):
+    monkeypatch.setenv("JIRA_LIVE_SMOKE_CONFIRM", "YES")
+    for key, value in {
+        "JIRA_URL": "https://example.atlassian.net",
+        "JIRA_PROJECT_KEY": "KAN",
+        "JIRA_EMAIL": "fake@example.com",
+        "JIRA_API_TOKEN": "dummy",
+    }.items():
+        monkeypatch.setenv(key, value)
+
+    def fake_jira(path, method="GET", payload=None, params=None):
+        if path == "search/jql":
+            return {"issues": [{"key": "KAN-100"}]}
+        if path == "issue/KAN-100":
+            return {"fields": {
+                "summary": "[INTEGRATION TEST - NOT A DEFECT][IOS] IOS-JIRA-SMOKE-001",
+                "labels": ["integration-test", "genai-mobile-ios-jira-smoke-001"],
+            }}
+        pytest.fail(f"Unexpected request: {method} {path}")
+
+    monkeypatch.setattr(integrations, "jira", fake_jira)
+    outcome = integrations.verify_jira_live("ios")
+    assert outcome["first_pass"] == "reused existing smoke issue"
+    assert outcome["second_pass"] == "reused same issue"

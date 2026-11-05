@@ -31,6 +31,11 @@ on:
         type: choice
         default: preview
         options: [preview, create]
+      verify_jira_live:
+        description: Jira-only live smoke (creates/reuses one clearly labeled synthetic issue; skips Appium)
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -41,6 +46,7 @@ concurrency:
 
 jobs:
   cloud-mobile:
+    if: ${{ !inputs.verify_jira_live }}
     name: Appium ${{ matrix.platform }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -135,3 +141,24 @@ jobs:
         run: |
           echo "::error::Native test run failed. See TestRail results and BrowserStack recordings."
           exit 1
+
+  jira-live-smoke:
+    name: Verify Jira creation and duplicate reuse
+    if: ${{ inputs.verify_jira_live }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      JIRA_URL: ${{ vars.JIRA_URL || secrets.JIRA_URL }}
+      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || secrets.JIRA_PROJECT_KEY }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_LIVE_SMOKE_CONFIRM: YES
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install HTTP client
+        run: python -m pip install "requests>=2.32,<3"
+      - name: Create or reuse one synthetic Jira issue, then verify reuse
+        run: python -m mobileqa.integrations --platform ios --verify-jira-live

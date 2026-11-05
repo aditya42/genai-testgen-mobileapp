@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 import requests
@@ -149,13 +150,15 @@ def preview_jira_candidates(platform, report):
     ]
 
 
-def publish_jira_candidates(platform, report, run_id=None, mapping=None):
+def publish_jira_candidates(platform, report, run_id=None, mapping=None, *, smoke=False):
     project = os.environ["JIRA_PROJECT_KEY"]
     candidates = []
     for case in report["cases"]:
         if case["status"] != "failed" or not jira_eligible(case["attempts"]):
             continue
         case_id = case["id"]
+        if smoke and case_id != f"{platform.upper()}-JIRA-SMOKE-001":
+            raise ValueError("Jira smoke mode accepts only its synthetic case")
         label = "genai-mobile-" + case_id.lower()
         existing = jira("search/jql", params={
             "jql": f'project = "{project}" AND labels = "{label}"',
@@ -170,7 +173,9 @@ def publish_jira_candidates(platform, report, run_id=None, mapping=None):
         if bug is None:
             raise RuntimeError("Jira project has no Bug issue type")
         last_error = case["attempts"][-1]["error"][:2500]
-        message = (f"Repeated Appium assertion failure on {platform.upper()}."
+        prefix = ("SYNTHETIC JIRA INTEGRATION TEST, NOT A PRODUCT DEFECT."
+                  if smoke else f"Repeated Appium assertion failure on {platform.upper()}.")
+        message = (prefix
                    f"\nRequirement: {case_id}"
                    f"\nTestRail run: {run_id or 'not published'}"
                    f"\nTestRail case: {(mapping or {}).get(case_id, 'unknown')}"
@@ -180,12 +185,92 @@ def publish_jira_candidates(platform, report, run_id=None, mapping=None):
                    f"\nClassification: candidate product defect; requires human verification.")
         body = {"fields": {
             "project": {"key": project}, "issuetype": {"id": str(bug["id"])},
-            "summary": f"[Mobile QA][{platform.upper()}] {case_id} repeated assertion failure",
+            "summary": (
+                f"[INTEGRATION TEST - NOT A DEFECT][{platform.upper()}] {case_id}"
+                if smoke else
+                f"[Mobile QA][{platform.upper()}] {case_id} repeated assertion failure"
+            ),
             "description": _adf(message),
-            "labels": ["automated-qa", "mobile", "browserstack", "needs-triage", label],
+            "labels": (["automated-qa", "mobile", "integration-test", label]
+                       if smoke else
+                       ["automated-qa", "mobile", "browserstack", "needs-triage", label]),
         }}
         candidates.append(jira("issue", "POST", body)["key"])
     return candidates
+
+
+def verify_jira_live(platform):
+    """Explicit smoke: one synthetic issue and a second idempotent publish.
+
+    The stable smoke ID prevents new issues on repeated workflow executions.
+    No Appium test, TestRail result or product assertion is modified.
+    """
+    if os.getenv("JIRA_LIVE_SMOKE_CONFIRM") != "YES":
+        raise ValueError("Live Jira smoke requires explicit confirmation")
+    for key in ("JIRA_URL", "JIRA_PROJECT_KEY", "JIRA_EMAIL", "JIRA_API_TOKEN"):
+        if not os.getenv(key):
+            raise ValueError(f"Missing {key}")
+    case_id = f"{platform.upper()}-JIRA-SMOKE-001"
+    label = "genai-mobile-" + case_id.lower()
+    project = os.environ["JIRA_PROJECT_KEY"]
+    query = f'project = "{project}" AND labels = "{label}"'
+
+    def matched_issues():
+        response = jira("search/jql", params={
+            "jql": query, "maxResults": 2, "fields": "key",
+        })
+        return response.get("issues", [])
+
+    prior = matched_issues()
+    if len(prior) > 1:
+        raise RuntimeError("Duplicate smoke labels already exist; refusing to create")
+    failed = {
+        "status": "failed",
+        "error": "AssertionError: synthetic Jira integration verification only",
+    }
+    report = {"cases": [{
+        "id": case_id, "status": "failed", "attempts": [failed, failed],
+    }]}
+    first = publish_jira_candidates(platform, report, smoke=True)
+    if len(first) != 1:
+        raise RuntimeError("First smoke publish returned no single Jira issue")
+    key = first[0]
+    detail = jira(f"issue/{key}")
+    fields = detail.get("fields", {})
+    if label not in fields.get("labels", []):
+        raise RuntimeError("Jira issue missing stable deduplication label")
+    if not fields.get("summary", "").startswith("[INTEGRATION TEST - NOT A DEFECT]"):
+        raise RuntimeError("Jira smoke issue missing synthetic test warning")
+    # Atlassian search indexing can lag behind successful issue creation.
+    for _ in range(8):
+        matches = matched_issues()
+        if len(matches) == 1 and matches[0]["key"] == key:
+            break
+        if len(matches) > 1:
+            raise RuntimeError("Duplicate Jira smoke issues detected")
+        time.sleep(5)
+    else:
+        raise RuntimeError("Created Jira smoke issue not indexed for duplicate lookup")
+    second = publish_jira_candidates(platform, report, smoke=True)
+    if second != first:
+        raise RuntimeError(f"Jira duplicate reuse failed: {first} versus {second}")
+    matches = matched_issues()
+    if len(matches) != 1 or matches[0]["key"] != key:
+        raise RuntimeError("Expected exactly one matching Jira issue after reuse")
+    status = "reused existing smoke issue" if prior else "created one smoke issue"
+    outcome = {"platform": platform, "issue": key, "first_pass": status,
+               "second_pass": "reused same issue", "duplicate_count": 0}
+    summary = os.getenv("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as handle:
+            handle.write(
+                "### Jira live integration verification\n"
+                f"- Issue: {key} (SYNTHETIC TEST, NOT A PRODUCT DEFECT)\n"
+                f"- First publish: {status}\n"
+                "- Second publish: reused same issue\n"
+                "- Duplicates created: 0\n"
+            )
+    return outcome
 
 
 def main():
@@ -196,7 +281,14 @@ def main():
                         help="Create/reuse Jira review issues")
     parser.add_argument("--jira-preview", action="store_true",
                         help="Preview eligible cases without contacting Jira")
+    parser.add_argument("--verify-jira-live", action="store_true",
+                        help="Explicit live synthetic Jira create/reuse verification")
     args = parser.parse_args()
+    if args.verify_jira_live:
+        if args.testrail or args.jira or args.jira_preview:
+            parser.error("--verify-jira-live must be run alone")
+        print(json.dumps(verify_jira_live(args.platform)))
+        return
     report = load_results(args.platform)
     run_id, mapping = (None, {})
     if args.testrail:

@@ -97,3 +97,24 @@ Publishing to TestRail is independent of Jira mode. Never add API tokens to
 the repository or log them. The initial Jira API integration is tested
 offline with mocked endpoints; a real Jira creation test remains a separate
 explicitly authorized step.
+
+## Verify real Jira issue creation and duplicate reuse
+
+The existing **BrowserStack Android and iOS Appium** workflow has a separate
+manual-only mode: `verify_jira_live=true`. This mode skips all mobile tests
+and TestRail publishing. It uses `JIRA_URL`, `JIRA_PROJECT_KEY`, `JIRA_EMAIL`,
+and `JIRA_API_TOKEN` from GitHub Actions.
+
+This test is deliberately **not** an application defect. It creates one Jira
+Bug titled `[INTEGRATION TEST - NOT A DEFECT][IOS] IOS-JIRA-SMOKE-001`,
+labeled `integration-test` and `genai-mobile-ios-jira-smoke-001`; it does
+not apply `needs-triage`. The workflow first creates or reuses the stable
+smoke ticket, verifies its contents, waits briefly for Jira search indexing,
+then publishes the same candidate again and asserts **the identical Jira
+issue key** was reused, with exactly one matching issue in Jira search.
+
+On the first execution, expect `created one smoke issue` followed by
+`reused same issue`. On later executions, expect both calls to reuse the
+same existing issue. **A real Jira issue remains in the project** so reviewers
+can inspect it; do not treat it as an actual product defect. No API token
+or synthetic failure is inserted into the mobile regression suite.
